@@ -2,9 +2,15 @@ package info.honzamusil.auth0.configuration
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder
 import org.springframework.security.config.web.server.ServerHttpSecurity
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.server.SecurityWebFilterChain
+import org.springframework.security.web.server.authentication.AuthenticationWebFilter
+import org.springframework.security.web.server.authentication.ServerAuthenticationConverter
 
 
 @Configuration
@@ -13,11 +19,40 @@ class SecurityConfig {
 
     @Bean
     @Throws(Exception::class)
-    fun configure(http: ServerHttpSecurity): SecurityWebFilterChain? {
+    fun configure(
+        http: ServerHttpSecurity,
+        jwtAuthenticationManager: ReactiveAuthenticationManager,
+        jwtAuthenticationConverter: ServerAuthenticationConverter
+    ): SecurityWebFilterChain? {
+
+        val authenticationWebFilter = AuthenticationWebFilter(jwtAuthenticationManager)
+        authenticationWebFilter.setServerAuthenticationConverter(jwtAuthenticationConverter)
+
+
         return http.authorizeExchange()
             .pathMatchers("/api/public").permitAll()
             .pathMatchers("/api/private").authenticated()
-            .and().formLogin()
-            .and().cors().and().build()
+            .pathMatchers("/user/signup")
+            .permitAll()
+            .pathMatchers("/user/login")
+            .permitAll()
+            .pathMatchers("/user")
+            .authenticated()
+//            .and().cors()
+            .and().addFilterAt(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .httpBasic()
+            .disable()
+            .formLogin()
+            .disable()
+            .logout()
+            .disable()
+            .csrf()
+            .disable()
+            .build()
+    }
+
+    @Bean
+    fun passwordEncoder(): PasswordEncoder? {
+        return BCryptPasswordEncoder()
     }
 }
